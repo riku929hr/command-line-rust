@@ -1,48 +1,48 @@
-use clap::{Arg, ArgAction, Command};
+use std::{
+    fs::File,
+    io::{stdin, BufRead, BufReader},
+};
 
-#[derive(Debug)]
+use anyhow::Result;
+use clap::Parser;
+
+#[derive(Debug, Parser)]
+#[command(author, about, version)]
 struct Args {
+    /// Input files
+    #[arg(value_name = "FILE", default_value = "-")]
     files: Vec<String>,
+
+    /// Number lines
+    #[arg(short('n'), long("number"), conflicts_with("number_nonblank_lines"))]
     number_lines: bool,
+
+    /// Number non-blank lines
+    #[arg(short('b'), long("number-nonblank"))]
     number_nonblank_lines: bool,
 }
 
-fn get_args() -> Args {
-    let matches = Command::new("catr")
-        .version("0.1.0")
-        .author("Author")
-        .about("Rust version of cat")
-        .arg(
-            Arg::new("files")
-                .value_name("FILE")
-                .help("Input files")
-                .num_args(1..)
-                .default_value("-"),
-        )
-        .arg(
-            Arg::new("number_lines")
-                .short('n')
-                .long("number")
-                .action(ArgAction::SetFalse)
-                .help("Number all output lines"),
-        )
-        .arg(
-            Arg::new("number_nonblank_lines")
-                .short('b')
-                .long("number-nonblank")
-                .action(ArgAction::SetFalse)
-                .help("Number nonempty output lines"),
-        )
-        .get_matches();
-
-    Args {
-        files: matches.get_many("files").unwrap().cloned().collect(),
-        number_lines: matches.get_flag("number_lines"),
-        number_nonblank_lines: matches.get_flag("number_nonblank_lines"),
+fn open(filename: &str) -> Result<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
     }
 }
 
+fn run(args: Args) -> Result<()> {
+    for filename in args.files {
+        match open(&filename) {
+            Err(e) => eprintln!("Failed to open {filename}: {e}"),
+            Ok(_) => println!("Opened {filename}"),
+        }
+    }
+
+    Ok({})
+}
+
 fn main() {
-    let args = get_args();
-    println!("{:#?}", args);
+    if let Err(e) = run(Args::parse()) {
+        eprintln!("{e}");
+        std::process::exit(1);
+    }
 }
